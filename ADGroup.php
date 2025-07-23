@@ -1,7 +1,7 @@
 <?php
 class ADGroup extends ADPrincipal
 {
-    public array $members;
+    public array $member = array();
     public string $groupCategory;
     public string $groupScope;
       

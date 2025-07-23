@@ -3,6 +3,7 @@ class ADUser extends ADAccount
 {
     public string $givenName;
     public string $surname;
+    public string $employeeId;
     
     public function __construct($identity, $searchBase = ADConfig::DEFAULT_DN, $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, $properties = array(), $ldapConnection = null)
     {

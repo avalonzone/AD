@@ -8,18 +8,18 @@ class ADObject extends ADEntity
     public string $distinguishedName;
         
     // Constructor $identity parameter takes ADGUID, GUID, DN, ADFilter
-    public function __construct($identity, $searchBase = LDAP_Config::DEFAULT_DN, $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, $properties = array(), $ldapConnection = null)
+    public function __construct($identity, $searchBase = LDAP_Config::DEFAULT_DN, $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, $properties = array(), $ldapConnection = null,  bool $defaultProperties = true)
     {                
         if(is_string($identity) && preg_match(Config::REGEX_DN, $identity))
         {
             $ADFilterAttributeDistinguishedName = new ADFilterAttribute("distinguishedname", $identity);
             $ADFilter = new ADFilter($ADFilterAttributeDistinguishedName);
             $identity = $ADFilter;
-            parent::__construct($identity, $searchBase, $searchScope, $properties, $ldapConnection);
+            parent::__construct($identity, $searchBase, $searchScope, $properties, $ldapConnection, $defaultProperties);
         }
         else
         {
-            parent::__construct($identity, $searchBase, $searchScope, $properties, $ldapConnection);
+            parent::__construct($identity, $searchBase, $searchScope, $properties, $ldapConnection, $defaultProperties);
         }      
     }
     

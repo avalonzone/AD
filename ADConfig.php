@@ -1,7 +1,8 @@
 <?php
 abstract class ADConfig
 {
-    const DEFAULT_DN     = "dc=domain,dc=extention";
+    const DEFAULT_DN     = Config::DEFAULT_SEARCH_DN; //Adapt these value to value that suits your environment
+    const DEFAULT_ORG_DN = Config::DEFAULT_ORG_DN; //Adapt these value to value that suits your environment
    
     const OBJECT_CATEGORY_PERSON   = 'person';
     const OBJECT_CATEGORY_GROUP    = 'group';
@@ -11,6 +12,15 @@ abstract class ADConfig
     const SEARCH_SCOPE_BASE = 0;
     const SEARCH_SCOPE_ONELEVEL = 1;
     const SEARCH_SCOPE_SUBTREE = 2;
+     
+    const SEARCH_FILTER_TYPE_AND = 0;
+    const SEARCH_FILTER_TYPE_OR = 1;
+    const SEARCH_FILTER_TYPE_NOT = 2;
+    
+    const SEARCH_FILTER_OPERATOR_EQUAL = "=";
+    const SEARCH_FILTER_OPERATOR_GREATER = ">=";
+    const SEARCH_FILTER_OPERATOR_LESS = "<=";
+    const SEARCH_FILTER_OPERATOR_APPROXIMATE = "~=";
     
     const REGEX_MATCH_SID  = "/^S-\d-\d+-(\d+-){1,14}\d+$/";
     const REGEX_MATCH_DN   = '/^(?:(?<cn>CN=(?<name>[^,]*)),)?(?:(?<path>(?:(?:CN|OU)=[^,]+,?)+),)?(?<domain>(?:DC=[^,]+,?)+)$/';
@@ -38,10 +48,14 @@ abstract class ADConfig
     const ADS_UF_TRUSTED_TO_AUTHENTICATE_FOR_DELEGATION =   "00000001000000000000000000000000"; // 16777216 
     const ADS_UF_PARTIAL_SECRETS_ACCOUNT =                  "00000100000000000000000000000000"; // 67108864
         
-    const DOMAIN_GUID = "00000000-0000-0000-0000-000000000000";
-    const PASSWORD = 'ldap_reader_password';
-    const DOMAIN_NAME = 'domain.extention';
-    const PRIMARY_DOMAIN_CONTROLLER = 'pdc.domain.extention';
-    const DEFAULT_SEARCH_DN = "dc=domain, dc=extention";
-    const SAM_ACCOUNT_NAME = 'ldap_reader_samaccountname';
+
+    const DOMAIN_GUID = "xxxxxxxx-xxxx-xxxx-xxx-xxxxxxxxxxxx"; // Should be working but none of these guid works
+    
+    const PASSWORD = Config::PASSWORD; //Adapt these value to value that suits your environment
+    const DOMAIN_NAME = Config::DOMAIN_NAME; //Adapt these value to value that suits your environment
+    const DOMAIN_CONTROLLER = Config::DOMAIN_CONTROLLER; //Adapt these value to value that suits your environment
+    const DEFAULT_SEARCH_DN = Config::DEFAULT_SEARCH_DN; //Adapt these value to value that suits your environment
+    const SAM_ACCOUNT_NAME = Config::SAM_ACCOUNT_NAME; //Adapt these value to value that suits your environment
+    const PRIMARY_DOMAIN_CONTROLLER = Config::PRIMARY_DOMAIN_CONTROLLER; //Adapt these value to value that suits your environment
+
 }

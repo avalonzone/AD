@@ -1,11 +1,14 @@
 <?php
 class ADEntity extends ADPropertyCollection
-{       
-    // Constructor $identity parameter takes GUID, ADFilter
-    public function __construct($identity, $searchBase = ADConfig::DEFAULT_DN, $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, $properties = array(), $ldapConnection = null)
-    {     
-        $properties = self::joinProperties($properties);
-        
+{           
+    // Constructor $identity parameter takes GUID, ADFilter, Array (ldap result array)
+    public function __construct($identity, $searchBase = ADConfig::DEFAULT_DN, $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, $properties = array(), $ldapConnection = null, bool $defaultProperties = true)
+    {   
+        if($defaultProperties){
+            $properties = self::joinProperties($properties, $defaultProperties);
+        }else{
+            $properties = array("objectguid");
+        }
         if(is_string($identity))
         {
             if(ADGUID::isGUID($identity))
@@ -16,7 +19,11 @@ class ADEntity extends ADPropertyCollection
         }
         else
         {
-            if(is_a($identity, "ADGUID"))
+            if(is_array($identity))
+            {
+                parent::__construct($identity);
+            }
+            elseif(is_a($identity, "ADGUID"))
             {
                 parent::__construct(self::getADEntity($identity->hexADFilterGUID, $searchBase, $searchScope, $properties, $ldapConnection));
             }
@@ -30,10 +37,16 @@ class ADEntity extends ADPropertyCollection
             }
         }     
     }
-    
-    public static function joinProperties($customProperties)
+        
+    public static function joinProperties($customProperties, $defaultProperties = true)
     {
-        $properties = self::getProperties();
+        
+        if($defaultProperties){
+            $properties = self::getProperties();
+        }else{
+            $properties = array("objectguid");
+        }
+        
         foreach($customProperties as $property)
         {
             if(!in_array(strtolower($property), $properties))
@@ -44,13 +57,32 @@ class ADEntity extends ADPropertyCollection
         return $properties;
     }
        
+    /*
+     *  $pageSize = 100;
+        $cookie = '';
+        $results = array();
+        do {
+          ldap_control_paged_result($ds, $pageSize, true, $cookie);
+        
+          $result  = ldap_search($ds, $dn, $filter, $justthese);
+          $entries = ldap_get_entries($ds, $result);
+        
+          foreach ($entries as $e) {
+            $results[] = $e;
+          }
+        
+          ldap_control_paged_result_response($ds, $result, $cookie);
+        
+        } while($cookie !== null && $cookie != '');
+    */
+    
     public static function getADEntity(ADFilter $ADFilter, string $searchBase = ADConfig::DEFAULT_DN, int $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, array $properties = array(), $ldapConnection = null)
     {
         if(is_null($ldapConnection))
         {
             $ldapConnection = ADUtils::getConnection();
         }
-        
+                
         switch($searchScope)
         {
             case ADConfig::SEARCH_SCOPE_ONELEVEL :
@@ -70,6 +102,7 @@ class ADEntity extends ADPropertyCollection
         
         if ($entries['count'] > 0)
         {
+            
             return $entries[0];
         }
         else

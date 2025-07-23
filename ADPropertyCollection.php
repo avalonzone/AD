@@ -1,11 +1,11 @@
 <?php
 class ADPropertyCollection extends ArrayObject
-{        
+{            
     public function __construct($array = array())
     {
         //Get all instance public properties
         $classProperties = array_keys(get_class_vars(get_class($this)));
-        
+                
         //Cycle through properties and set them to lower case
         $indexedClassProperties = array();
         
@@ -92,7 +92,7 @@ class ADPropertyCollection extends ArrayObject
                         }
                         catch (Exception $e)
                         {
-                            $array[$key] = array();
+                            $array[$key] = array($array[$key]);
                         }
                         break;
                     // In case memberof get auto casted to string if only one element ^^
@@ -103,7 +103,7 @@ class ADPropertyCollection extends ArrayObject
                         }
                         break;
                     // In case members get auto casted to string if only one element ^^
-                    case "members" :
+                    case "member" :
                         if(is_string($array[$key]))
                         {
                             $array[$key] = array($array[$key]);
@@ -126,32 +126,61 @@ class ADPropertyCollection extends ArrayObject
                         $array["doesnotrequirepreauth"] = ADUtils::isBinaryFlagSet($array[$key], ADConfig::ADS_UF_DONT_REQUIRE_PREAUTH);                         
                         break;
                 }
-                
-                //Populate class public properties if there is a match            
-                if(array_key_exists($key, $indexedClassProperties))
-                {
-                    // Is this necessary ????
-                    if(isset($array[$key]))
-                    {
-                        $classProperty = $indexedClassProperties[$key];
-                        $this->$classProperty = $array[$key];
-                    }                
-                }              
             }   
         }
-                
+          
+        foreach ($array as $key=>$value)
+        {
+            //Populate class public properties if there is a match
+            if(array_key_exists($key, $indexedClassProperties))
+            {
+                // Is this necessary ????
+                if(isset($array[$key]))
+                {
+                $classProperty = $indexedClassProperties[$key];
+                $this->$classProperty = $array[$key];
+                }
+            }   
+        }
+        
         // Construct the ArrayObject with the cleaned up array
         parent::__construct($array, ArrayObject::ARRAY_AS_PROPS);
     }
-    
+
     public static function getProperties(bool $strtoLower = true)
     {
         $classProperties = array_keys(get_class_vars(get_called_class()));
         
+        if(isset($_SESSION["ADFastMode"]) && $_SESSION["ADFastMode"] == true)
+        {
+            $memberOfKey = array_search("memberOf", $classProperties);
+            $memberKey = array_search("member", $classProperties);
+            
+            if($memberOfKey)
+            {
+                unset($classProperties[$memberOfKey]);
+            }
+            
+            if($memberKey)
+            {
+                unset($classProperties[$memberKey]);
+            }
+              
+            $classProperties = array_values($classProperties);
+        }
+        
         if($strtoLower)
         {
-            foreach ($classProperties as $key=>$value) {
+            foreach ($classProperties as $key=>$value)
+            {
                 $classProperties[$key] = strtolower($value);
+            }
+        }
+        else
+        {
+            foreach ($classProperties as $key=>$value)
+            {
+                $classProperties[$key] = $value;
             }
         }
         

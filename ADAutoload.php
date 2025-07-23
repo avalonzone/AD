@@ -17,6 +17,9 @@
  * AD SPL autoloader.
  * @param string $classname The name of the class to load
  */
+
+$_SESSION["ADFastMode"] = false;
+
 function ADAutoload($classname)
 {
     

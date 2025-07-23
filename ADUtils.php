@@ -6,7 +6,7 @@ abstract class ADUtils
      */
     public static function getConnection()
     {
-        $ldapConnection = ldap_connect("ldap://" . ADConfig::DOMAIN_NAME);
+        $ldapConnection = ldap_connect("ldap://" . ADConfig::DOMAIN_CONTROLLER);
         
         if($ldapConnection)
         {
@@ -40,7 +40,7 @@ abstract class ADUtils
      * @param string $searchScope
      * @param array $properties
      * @param mixed $ldapConnection
-     * @return ADObject | Array
+     * @return Array
      */
     public static function getADObject($identity, string $searchBase = ADConfig::DEFAULT_DN, string $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, array $properties = array(), $ldapConnection = null) : Array
     {
@@ -48,7 +48,7 @@ abstract class ADUtils
         if(is_a($identity, "ADFilter", true))
         {            
             $ADObjects = new ADObjectCollection($identity, $searchBase, $searchScope, $properties, $ldapConnection);
-            return $ADObjects;
+            return $ADObjects->getArrayCopy();
         }
         else
         {
@@ -65,36 +65,47 @@ abstract class ADUtils
      * @param string $searchScope
      * @param array $properties
      * @param mixed $ldapConnection
-     * @return ADUser | Array
+     * @return Array
      */
     public static function getADUser($identity, string $searchBase = ADConfig::DEFAULT_DN, string $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, array $properties = array(), $ldapConnection = null) : Array
     {
+        $subscope = null;
+        if(($searchScope != 1 && $searchScope != 2)){
+            $subscope = $searchScope;
+            $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE;
+        }
         // If TRUE, multiple search results are expected...
         if(is_a($identity, "ADFilter", true))
-        {
+        {           
+            $ADUserFilterAttibuteObjectCategory = new ADFilterAttribute("objectcategory", "person");
+            $ADUserFilterAttributeObjectClass = new ADFilterAttribute("objectclass", "user");
+            $identity->addADFilterAttributes(array($ADUserFilterAttibuteObjectCategory, $ADUserFilterAttributeObjectClass));
             
             if(is_null($ldapConnection))
             {
                 $ldapConnection = self::getConnection();
             }
                        
-            $ADObjects = new ADObjectCollection($identity, $searchBase, $searchScope, $properties, $ldapConnection);
+            $ADObjects = new ADObjectCollection($identity, $searchBase, $searchScope, $properties, $ldapConnection, "ADUser");
             $ADUsers = array();
             
             foreach($ADObjects as $ADObject)
             {
-                $ADUsers[] = new ADUser($ADObject, $searchBase, $searchScope, $properties, $ldapConnection);
+                if($subscope){
+                    if(str_contains($ADObject['distinguishedname'][0], $subscope)){
+                        $ADUsers[] = new ADUser($ADObject, $searchBase, $searchScope, $properties, $ldapConnection);
+                    }
+                }else{
+                    $ADUsers[] = new ADUser($ADObject, $searchBase, $searchScope, $properties, $ldapConnection);
+                }
             }
-            
             return $ADUsers;
         }
         else
         {
             $ADUser = new ADUser($identity, $searchBase, $searchScope, $properties, $ldapConnection);
             return array($ADUser);
-        }
-
-        
+        }      
     }
     
     /**
@@ -105,32 +116,34 @@ abstract class ADUtils
      * @param string $searchScope
      * @param array $properties
      * @param mixed $ldapConnection
-     * @return ADGroup | Array
+     * @param bool $defaultProperties show default properties such as objectClass, objectGuid, objectSID, member, SAM, DN, ...
+     * @return Array
      */
-    public static function getADGroup($identity, string $searchBase = ADConfig::DEFAULT_DN, string $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, array $properties = array(), $ldapConnection = null) : Array
+    public static function getADGroup($identity, string $searchBase = ADConfig::DEFAULT_DN, string $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, array $properties = array(), $ldapConnection = null, $responseObject = null, bool $defaultProperties = true) : Array
     {
         // If TRUE, multiple search results are expected...
         if(is_a($identity, "ADFilter", true))
         {
+            $ADGroupFilterAttibuteObjectCategory = new ADFilterAttribute("objectcategory", "group");
+            $identity->addADFilterAttributes(array($ADGroupFilterAttibuteObjectCategory));
             
             if(is_null($ldapConnection))
             {
                 $ldapConnection = self::getConnection();
             }
             
-            $ADObjects = new ADObjectCollection($identity, $searchBase, $searchScope, $properties, $ldapConnection);
+            $ADObjects = new ADObjectCollection($identity, $searchBase, $searchScope, $properties, $ldapConnection, "ADGroup", $defaultProperties);
             $ADGroups = array();
             
             foreach($ADObjects as $ADObject)
             {
-                $ADGroups[] = new ADGroup($ADObject, $searchBase, $searchScope, $properties, $ldapConnection);
+                $ADGroups[] = new ADGroup($ADObject, $searchBase, $searchScope, $properties, $ldapConnection, $defaultProperties);
             }
-            
             return $ADGroups;
         }
         else
         {
-            $ADGroup = new ADGroup($identity, $searchBase, $searchScope, $properties, $ldapConnection);
+            $ADGroup = new ADGroup($identity, $searchBase, $searchScope, $properties, $ldapConnection, $defaultProperties);
             return array($ADGroup);
         }
     }
@@ -143,20 +156,22 @@ abstract class ADUtils
      * @param string $searchScope
      * @param array $properties
      * @param mixed $ldapConnection
-     * @return ADComputer  | Array
+     * @return Array
      */
     public static function getADComputer($identity, string $searchBase = ADConfig::DEFAULT_DN, string $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, array $properties = array(), $ldapConnection = null) : Array
     {
         // If TRUE, multiple search results are expected...
         if(is_a($identity, "ADFilter", true))
         {
+            $ADComputerFilterAttibuteObjectCategory = new ADFilterAttribute("objectcategory", "computer");
+            $identity->addADFilterAttributes(array($ADComputerFilterAttibuteObjectCategory));
             
             if(is_null($ldapConnection))
             {
                 $ldapConnection = self::getConnection();
             }
             
-            $ADObjects = new ADObjectCollection($identity, $searchBase, $searchScope, $properties, $ldapConnection);
+            $ADObjects = new ADObjectCollection($identity, $searchBase, $searchScope, $properties, $ldapConnection, "ADComputer");
             $ADComputers = array();
             
             foreach($ADObjects as $ADObject)
@@ -190,6 +205,27 @@ abstract class ADUtils
         return $ADOrganizationalUnit;
     }
     
+    /**
+     * Get an ADUser
+     *
+     * @param string $identity (ADFilter, ADGUID, GUID, DN, SID, SAM, Email)
+     * @param string $searchBase
+     * @param string $searchScope
+     * @param array $properties
+     * @param mixed $ldapConnection
+     * @return Array
+     */
+    public static function getADRecipient(string $identity, string $searchBase = ADConfig::DEFAULT_DN, string $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, array $properties = array(), $ldapConnection = null) : Array
+    {
+        if(is_null($ldapConnection))
+        {
+            $ldapConnection = self::getConnection();
+        }
+        
+        $ADRecipient = new ADRecipient($identity, $searchBase, $searchScope, $properties, $ldapConnection);
+        return array($ADRecipient);
+    }
+    
     // Domain GUID is something appart and out of scope
     // so this function is not working even with the reversed byte GUID...
     public static function getADDomain($domainGUID = ADConfig::DOMAIN_GUID)
@@ -200,7 +236,7 @@ abstract class ADUtils
     }
         
     /**
-     * Get the nesded memberof of an object
+     * Get the nested memberof of an object
      * If $recurse is set to false, only the first level up is retreived.
      *
      * @param string $distinguishedName
@@ -213,6 +249,22 @@ abstract class ADUtils
     public static function getMemberOf(string $distinguishedName,array &$groups, string $searchBase = ADConfig::DEFAULT_DN, $ldapConnection = null, $recurse = true)
     {
         return self::getADGenericBidirectionalMembership("memberof", $distinguishedName, $groups, $searchBase, $ldapConnection, $recurse);
+    }
+    
+    /**
+     * Get the nested memberof of an object
+     * If $recurse is set to false, only the first level up is retreived.
+     *
+     * @param string $distinguishedName
+     * @param array $groupList
+     * @param array $searchBase
+     * @param $ldapConnection
+     * @param bool $recurse
+     * @return NULL|array
+     */
+    public static function getMemberOfAsADObject(string $distinguishedName,array &$groups, string $searchBase = ADConfig::DEFAULT_DN, $ldapConnection = null, $recurse = true)
+    {
+        return self::getADGenericBidirectionalMembershipAsADObject("memberof", $distinguishedName, $groups, $searchBase, $ldapConnection, $recurse);
     }
     
     /**
@@ -279,7 +331,37 @@ abstract class ADUtils
     }
     
     /**
-     * Get the nesded member of an object
+     * Get the nesded members of an object
+     * If $recurse is set to false, only the first level down is retreived.
+     *
+     * @param string $distinguishedName
+     * @param array $groupList
+     * @param array $searchBase
+     * @param $ldapConnection
+     * @param bool $recurse
+     * @return NULL|array
+     */
+    public static function getADGenericBidirectionalMembershipAsADObject(string $memberAttribute, string $distinguishedName, array &$groupList, string $searchBase = ADConfig::DEFAULT_DN, $ldapConnection = null, $recurse = true)
+    {
+        $distinguishedNames = self::getADGenericBidirectionalMembership($memberAttribute, $distinguishedName, $groupList, $searchBase, $ldapConnection, $recurse);
+        
+        $ADObjects = array();
+        
+        foreach ($distinguishedNames as $distinguishedName)
+        {
+            $ADObject = self::getADObject($distinguishedName);
+            
+            if(count($ADObject) == 1)
+            {
+                $ADObjects[] = (self::getADObject($distinguishedName))[0];
+            }
+            
+        }
+        return $ADObjects;
+    }
+    
+    /**
+     * Get the nesded members of an object
      * If $recurse is set to false, only the first level down is retreived.
      *
      * @param string $distinguishedName
@@ -292,6 +374,22 @@ abstract class ADUtils
     public static function getMembers(string $distinguishedName, array &$groupList, string $searchBase = ADConfig::DEFAULT_DN, $ldapConnection = null, $recurse = true)
     {
         return self::getADGenericBidirectionalMembership("member", $distinguishedName, $groupList, $searchBase, $ldapConnection, $recurse);
+    }
+    
+    /**
+     * Get the nesded members of an object
+     * If $recurse is set to false, only the first level down is retreived.
+     *
+     * @param string $distinguishedName
+     * @param array $groupList
+     * @param array $searchBase
+     * @param $ldapConnection
+     * @param bool $recurse
+     * @return NULL|array
+     */
+    public static function getMembersAsADObject(string $distinguishedName, array &$groupList, string $searchBase = ADConfig::DEFAULT_DN, $ldapConnection = null, $recurse = true)
+    {
+        return self::getADGenericBidirectionalMembershipAsADObject("member", $distinguishedName, $groupList, $searchBase, $ldapConnection, $recurse);
     }
     
     /**
@@ -373,7 +471,7 @@ abstract class ADUtils
      * @param mixed $ldapConnection
      * @return int
      */
-    public static function getADObjectSearchResultCount(ADFilter $ADFilter, string $searchBase = ADConfig::DEFAULT_DN, int $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, $ldapConnection = null, $properties = array("objectguid"))
+    public static function getADObjectSearchResultCount(ADFilter $ADFilter, string $searchBase = ADConfig::DEFAULT_DN, int $searchScope = ADConfig::SEARCH_SCOPE_SUBTREE, $ldapConnection = null, $properties = array("objectguid"), $sizeLimit = 150)
     {
         if(is_null($ldapConnection))
         {
@@ -383,10 +481,10 @@ abstract class ADUtils
         switch($searchScope)
         {
             case ADConfig::SEARCH_SCOPE_ONELEVEL :
-                $searchResult = @ldap_list($ldapConnection, $searchBase, $ADFilter->__tostring(), $properties, null, 150);
+                $searchResult = @ldap_list($ldapConnection, $searchBase, $ADFilter->__tostring(), $properties, null, $sizeLimit);
                 break;
             case ADConfig::SEARCH_SCOPE_SUBTREE :
-                $searchResult = @ldap_search($ldapConnection, $searchBase, $ADFilter->__tostring(), $properties, null, 150);
+                $searchResult = @ldap_search($ldapConnection, $searchBase, $ADFilter->__tostring(), $properties, null, $sizeLimit);
                 break;
         }
         
@@ -424,5 +522,49 @@ abstract class ADUtils
     public static function isBinaryFlagSet($flags,$flag)
     {
         return ($flags & $flag) == $flag ? true : false;
+    }
+    
+    public static function getParentOrganizationalUnit($identity, int $level = 0)
+    {
+        $matches = array();
+        preg_match_all("/(OU=['\w\s\-]+)/", $identity->distinguishedName, $matches);
+        
+        if($level >= 0 && count($matches) == 2 && $level < count($matches[1]))
+        {           
+            return str_replace("OU=", "", $matches[1][$level]);
+        }
+
+        return "No parent organizational unit at level " . $level;
+    }
+    
+    public static function setADFastMode(bool $isActivated = true)
+    {
+        $_SESSION["ADFastMode"] = $isActivated;
+        /*
+        if(isset($_SESSION["ADFastMode"]))
+        {
+            $_SESSION["ADFastMode"] = $isActivated;
+        }
+        */
+    }
+    
+    public static function removeAccentedCharacters(string $string) : string
+    {
+            $table = array(
+                'Š'=>'S', 'š'=>'s', 'Đ'=>'Dj', 'đ'=>'dj', 'Ž'=>'Z', 'ž'=>'z', 'Č'=>'C', 'č'=>'c', 'Ć'=>'C', 'ć'=>'c',
+                'À'=>'A', 'Á'=>'A', 'Â'=>'A', 'Ã'=>'A', 'Ä'=>'A', 'Å'=>'A', 'Æ'=>'A', 'Ç'=>'C', 'È'=>'E', 'É'=>'E',
+                'Ê'=>'E', 'Ë'=>'E', 'Ì'=>'I', 'Í'=>'I', 'Î'=>'I', 'Ï'=>'I', 'Ñ'=>'N', 'Ò'=>'O', 'Ó'=>'O', 'Ô'=>'O',
+                'Õ'=>'O', 'Ö'=>'O', 'Ø'=>'O', 'Ù'=>'U', 'Ú'=>'U', 'Û'=>'U', 'Ü'=>'U', 'Ý'=>'Y', 'Þ'=>'B', 'ß'=>'Ss',
+                'à'=>'a', 'á'=>'a', 'â'=>'a', 'ã'=>'a', 'ä'=>'a', 'å'=>'a', 'æ'=>'a', 'ç'=>'c', 'è'=>'e', 'é'=>'e',
+                'ê'=>'e', 'ë'=>'e', 'ì'=>'i', 'í'=>'i', 'î'=>'i', 'ï'=>'i', 'ð'=>'o', 'ñ'=>'n', 'ò'=>'o', 'ó'=>'o',
+                'ô'=>'o', 'õ'=>'o', 'ö'=>'o', 'ø'=>'o', 'ù'=>'u', 'ú'=>'u', 'û'=>'u', 'ý'=>'y', 'ý'=>'y', 'þ'=>'b',
+                'ÿ'=>'y', 'Ŕ'=>'R', 'ŕ'=>'r',
+            );
+            return strtr($string, $table);
+    }
+    
+    public static function getRecipient()
+    {
+        
     }
 }
